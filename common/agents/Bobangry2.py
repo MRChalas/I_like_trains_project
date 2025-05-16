@@ -290,7 +290,12 @@ class Agent(BaseAgent):
 
         closest_passenger = self.closest_passenger()
         distance_to_passenger = abs(closest_passenger[0] - self.x_train_position) + abs(closest_passenger[1] - self.y_train_position)
-        if distance_to_passenger < 120: #120 is arbitrary
+        radius=100#default value just in case
+        if len(self.all_trains)==1 or len(self.all_trains)==2:
+            radius=120
+        if len(self.all_trains)==3 or len(self.all_trains)==4:
+            radius=50
+        if distance_to_passenger < radius: 
             return True
         return False
 
@@ -445,7 +450,7 @@ class Agent(BaseAgent):
                 move = self.path_to_point(passenger_pos)
 
         else:
-            if len(self.all_trains[self.nickname]['wagons'])>=10:
+            if len(self.all_trains[self.nickname]['wagons'])>=5:
                 move = self.path_to_point(delivery_zone_pos)
             passenger_on_the_way = self.on_the_way()
             if passenger_on_the_way is True:
@@ -474,7 +479,7 @@ class Agent(BaseAgent):
                     move=self.delivery_donut()  
             else:
                 ultimate_strategy=False
-        if len(self.all_trains[self.nickname]['wagons'])>=20:
+        if len(self.all_trains[self.nickname]['wagons'])>=15:
                 move = self.path_to_point(delivery_zone_pos)
 
         return Move(move)
