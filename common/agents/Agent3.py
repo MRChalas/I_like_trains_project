@@ -251,7 +251,8 @@ class Agent(BaseAgent):
                         #continue
                 if not skip_neighbor:
                     points_to_evaluate.append(neighbor_point)
-        #print("no path found")
+        
+        print("no path found")
         return None #No path available
                 
     def close_to_delivery(self):
@@ -300,61 +301,40 @@ class Agent(BaseAgent):
         IN: None
         OUT: Move
         """
-        #if len(self.all_trains[self.nickname]['wagons'])>=1:
-
+        self.positions()
         DELIVER = 0
-        delivery_zone_pos = self.delivery_zone['position'] #closest_delivery_point(...)
 
+        #determine if train is long enough to go deliver passengers
         if len(self.all_trains[self.nickname]['wagons'])>=1:
             DELIVER = 1
 
         if DELIVER == 0:
-            close_to_delivery = self.close_to_delivery()
-            if close_to_delivery is True:
-                path = self.path_to_point(delivery_zone_pos)
-            else:
-                passenger_pos = self.closest_passenger()
-                path = self.path_to_point(passenger_pos)
-                
-#
-        else:
-            passenger_on_the_way = self.on_the_way()
-            if len(self.all_trains[self.nickname]['wagons'])>=15:
-                path = self.path_to_point(delivery_zone_pos)
-            elif passenger_on_the_way is True:
-                passenger_pos = self.closest_passenger()
-                path = self.path_to_point(passenger_pos)
-            else:
-                path = self.path_to_point(delivery_zone_pos)
-
-        #print(self.train_position, self.delivery_zone_pos)
+            passenger_pos = self.closest_passenger()
+            path = self.path_to_point(passenger_pos)
         
-        if self.train_position == self.delivery_zone_pos:
-            #print("On Goal")
-            move = self.avoid_wall()
-            #print(move)
-            return Move(move)
-        elif path:
-            #print("PATH", path)
+        else:
+            passenger_on_way = self.on_the_way()
+            #check if train is to long
+            if len(self.all_trains[self.nickname]['wagons'])>=7:
+                print("TOO LONG")
+                path = self.path_to_point(self.delivery_zone_pos)  
+            elif passenger_on_way:
+                print("Passenger on the way")
+                passenger_pos = self.closest_passenger()
+                path = self.path_to_point(passenger_pos)
+            else:
+                "delivery zone"
+                path = self.path_to_point(self.delivery_zone_pos) 
+
+        if path:
+            print("path")
             move = self.get_direction(list(path))
-            return Move(move)
         else:
-            #print("No valid move found")
+            print("AAAAVOOOID OBSTACCCCLE")
             move = self.avoid_wall()
-            #print(Move(move))
-            return Move(move)
+            print("Move", Move(move))
 
-        #moves = [Move.LEFT.value, Move.DOWN.value, Move.UP.value,  Move.RIGHT.value]
-        #goal = self.closest_passenger()
-        #path = self.path_to_point(goal)
-        #print(self.train_position, goal)
-        #print("Path:", path)
-        #for move in moves:
-        #    pos_of_move = self.new_position(self.train_position, move, 1)
-        #    print("POS of move", pos_of_move)
-        #    if list(pos_of_move) == path:
-        #        print("Move:", Move(move))
-        #        return Move(move)
-        
+        return Move(move) 
+
         
 

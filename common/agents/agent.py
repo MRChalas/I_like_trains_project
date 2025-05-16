@@ -48,7 +48,6 @@ class Agent(BaseAgent):
 
         return abs(current_x - point_x) + abs(current_y - point_y)
     
-    
     def new_position(self, position:tuple, move: tuple, num_of_moves: int):
         """
         Determines new train position after n moves
@@ -61,8 +60,6 @@ class Agent(BaseAgent):
 
         return (new_x, new_y)
     
-    
-
     def available_grid_coordinates(self):
         """
         Determines all grid coordinates which have no obstacle
@@ -94,8 +91,6 @@ class Agent(BaseAgent):
         
         return grid_coordinates
     
-
-    
     def around_head(self):
         """
         Determines coordinates which could possibly be filled by train heads after next move
@@ -126,7 +121,6 @@ class Agent(BaseAgent):
         
         return head_positions
                 
-    
     def closest_passenger(self):
         """
         Determines distance to closest passenger
@@ -273,7 +267,6 @@ class Agent(BaseAgent):
             return True
         return False
 
-
     def close_to_delivery(self):
         """
         Determines if the train is close to the delivery zone when it is trying to go towards a passenger
@@ -298,7 +291,7 @@ class Agent(BaseAgent):
         IN: None
         OUT: Move
         """
-        self.logger.debug(self.all_trains)
+        #self.logger.debug(self.all_trains)
         DELIVER = 0
         delivery_zone_pos = self.delivery_zone['position'] #closest_delivery_point(...)
 
@@ -324,7 +317,7 @@ class Agent(BaseAgent):
                 move = self.path_to_point(delivery_zone_pos)
             
         return Move(move)
-    #
+
 
 
 
