@@ -45,6 +45,8 @@ class Agent(BaseAgent):
         self.delivery_zone_pos = self.delivery_zone['position']
         self.x_delivery_position = self.delivery_zone['position'][0]
         self.y_delivery_position = self.delivery_zone['position'][1]
+        self.delivery_zone_perimeter = (2*self.delivery_zone['width']/self.cell_size  \
+                                        +   2*self.delivery_zone['height']/self.cell_size) + 4
 
         #grid costs
         self.AVAILABLE = 0
@@ -99,7 +101,25 @@ class Agent(BaseAgent):
                 closest_passenger = pos
 
         return closest_passenger
-    
+
+    def closest_delivery_zone_point(self):
+        """
+        Determines closest point within delivery zone train can go to
+        
+        IN:
+        OUT:
+        """
+        closest_delivery_point = (0,0)
+        min_distance = float('inf')
+        delivery_zone = self.delivery_zone()
+        for point in delivery_zone:
+            distance = self.distance_to_point(self.train_position,point)
+            if distance < min_distance:
+                min_distance = distance
+                closest_delivery_point = point
+
+        return closest_delivery_point
+     
     def neighbor_positions(self, current_point, grid_with_obstacles):
         self.positions()
         moves = [Move.LEFT.value, Move.DOWN.value, Move.UP.value,  Move.RIGHT.value]
@@ -162,24 +182,135 @@ class Agent(BaseAgent):
         #     print(i, end ="\n")
         return grid_coordinates
 
-    def avoid_wall(self):
+    def available_grid_coordinates(self):
+        """
+        Determines all grid coordinates which have no obstacle
+
+        IN: None
+        OUT: available coordinates' grid (list of tuples)
+        """
+
+        #reset grid
+        grid_coordinates = []
+
+        #fill in grid coordinates depending on game parameters
+        for x in range(0, self.game_width, self.cell_size):
+            for y in range(0, self.game_height, self.cell_size):
+                grid_coordinates.append((x,y))
+        
+        #remove train positions from available coordinates
+        for train in self.all_trains:
+            train_pos = tuple(self.all_trains[train]["position"])
+            #avoid errors in case of duplicate removal of positions
+            if train_pos in grid_coordinates: 
+                grid_coordinates.remove(train_pos)
+
+            #remove wagon positions from available coordinates
+            for wagon_pos in self.all_trains[train]["wagons"]: 
+                #avoid errors in case of duplicate removal of positions
+                if tuple(wagon_pos) in grid_coordinates:
+                    grid_coordinates.remove(tuple(wagon_pos))
+        
+        return grid_coordinates
+    
+    def around_head(self):
+        """
+        Determines coordinates which could possibly be filled by train heads after next move
+       
+        IN: None
+        OUT: list of tuples containing coordinates
+        """
+
+        # Reset head positions
+        head_positions=[]
+
+
+        for train in self.all_trains:
+            #avoid making perimeter around own head unavailable
+            if train == self.nickname:
+               continue
+
+            else:
+                head_position = tuple(self.all_trains[train]["position"])
+                #avoids duplicates
+                if head_position not in head_positions:
+                    head_positions.append(head_position)
+                moves = [Move.LEFT.value, Move.DOWN.value, Move.UP.value,  Move.RIGHT.value]
+                for move in moves:
+                   precaution_position=self.new_position(head_position, move, 1)
+                   #avoids duplicates
+                   if precaution_position not in head_positions:
+                        head_positions.append(precaution_position)
+        return head_positions
+
+    def delivery_zone(self):
+        """
+        Determines positions covered by delivery zone
+        
+        IN: None
+        OUT: list of (x,y) delivery zone coordinates 
+        """
+
         self.positions()
-        grid = self.grid_with_obstacles()
-        moves = [Move.LEFT.value, Move.DOWN.value, Move.UP.value,  Move.RIGHT.value]
-        moves.remove((self.move_vector[0]*(-1), self.move_vector[1]*(-1)))
-        possible_move = None
-        choice_of_move = None
-        for move in moves:
-            new_pos = self.new_position(self.train_position, move, 1)
-            if 0 <= new_pos[1]//self.cell_size < len(grid) and 0 <= new_pos[0]//self.cell_size < len(grid[0]):
-                if grid[new_pos[1]//self.cell_size][new_pos[0]//self.cell_size] != self.OCCUPIED:
-                    if grid[new_pos[1]//self.cell_size][new_pos[0]//self.cell_size] != self.AVOID:
-                        choice_of_move = move
-                    possible_move = move
-        if possible_move is None and choice_of_move is None:
-            #print("NO MOOOVE")
-            return Move.UP
-        return choice_of_move if choice_of_move is not None else possible_move
+        delivery_points=[]
+        #this function converts the given data to all positions contained in the delivery zone
+
+        for i in range(self.delivery_zone['height']//self.cell_size):
+            for j in range(self.delivery_zone['width']//self.cell_size):
+
+                x_position= self.x_delivery_position+i*self.cell_size
+                y_position = self.y_delivery_position+j*self.cell_size
+
+                delivery_points.append(x_position, y_position)
+
+        return delivery_points
+
+    def zone_around_delivery(self):
+        delivery_zone_list=[]
+        # this function is useful for the "ultimate strategy". It finds the positions of all spots/cells around the delivery zone
+        #the corners are taken care of in the first for loop
+
+        for i in range(-1,int(self.delivery_zone['width']/(self.cell_size))+1):
+                x1_position= self.x_delivery_position+i*self.cell_size
+                y1_position = self.y_delivery_position-self.cell_size
+
+                x2_position=self.x_delivery_position+i*self.cell_size
+                y2_position=self.y_delivery_position+self.delivery_zone['height']+self.cell_size
+                pos1=(x1_position,y1_position)
+                pos2=(x2_position,y2_position)
+                delivery_zone_list.append(pos1)
+                delivery_zone_list.append(pos2)
+
+        for j in range(0,int(self.delivery_zone['height']/(self.cell_size))):
+                x1_position= self.x_delivery_position-self.cell_size
+                y1_position = self.y_delivery_position+j*self.cell_size
+
+                x2_position=self.x_delivery_position+self.delivery_zone['width']
+                y2_position=self.y_delivery_position+j*self.cell_size
+                pos1=(x1_position,y1_position)
+                pos2=(x2_position,y2_position)
+                delivery_zone_list.append(pos1)
+                delivery_zone_list.append(pos2)
+
+        return delivery_zone_list
+    
+ #   def avoid_wall(self):
+ #       self.positions()
+ #       grid = self.grid_with_obstacles()
+ #       moves = [Move.LEFT.value, Move.DOWN.value, Move.UP.value,  Move.RIGHT.value]
+ #       moves.remove((self.move_vector[0]*(-1), self.move_vector[1]*(-1)))
+ #       possible_move = None
+ #       choice_of_move = None
+ #       for move in moves:
+ #           new_pos = self.new_position(self.train_position, move, 1)
+ #           if 0 <= new_pos[1]//self.cell_size < len(grid) and 0 <= new_pos[0]//self.cell_size < len(grid[0]):
+ #               if grid[new_pos[1]//self.cell_size][new_pos[0]//self.cell_size] != self.OCCUPIED:
+ #                   if grid[new_pos[1]//self.cell_size][new_pos[0]//self.cell_size] != self.AVOID:
+ #                       choice_of_move = move
+ #                   possible_move = move
+ #       if possible_move is None and choice_of_move is None:
+ #           return Move.UP
+ #       return choice_of_move if choice_of_move is not None else possible_move
 
     def path_to_point(self, goal):
 
@@ -200,8 +331,6 @@ class Agent(BaseAgent):
 
         #initialize distances and costs to record
         while points_to_evaluate:
-            #if len(points_to_evaluate) < 100:
-            #    print(len(points_to_evaluate))
             # chooses node with lowest cost
             points_to_evaluate.sort(key=lambda node: node.total_cost)
             current_point = points_to_evaluate.pop(0)
@@ -212,7 +341,6 @@ class Agent(BaseAgent):
                 continue
 
             if current_point == goal_point:
-                #print("goal reached")
                 best_path = []
                 #reconstruct shortest path
                 while current_point.previous_point:
@@ -221,8 +349,6 @@ class Agent(BaseAgent):
                 #reconstruct the path in the correct order
                 if best_path:
                     return best_path[-1]
-                else:
-                    return self.avoid_wall()
                 
             
             #points_to_evaluate.remove(current_point)
@@ -251,10 +377,102 @@ class Agent(BaseAgent):
                         #continue
                 if not skip_neighbor:
                     points_to_evaluate.append(neighbor_point)
-        
-        print("no path found")
+    
         return None #No path available
-                
+
+    def other_move(self, point: tuple):
+        """
+        Determines direction to take to get to closest passenger
+
+        IN: coordinates of the point the train is trying to reach (int, int)
+        OUT: best move the train can take (eg: Move.UP, Move.LEFT, ...)
+        """
+
+        self.positions()
+
+        #reset movement variables
+        moves = [Move.LEFT.value, Move.DOWN.value, Move.UP.value,  Move.RIGHT.value]
+        shortest_distance = float('inf')
+        best_move = None
+        best_safe_move = None
+        possible_moves = []
+        possible_safe_moves = []
+        other_possibility = []
+        other_safe_possibility = []
+
+        #remove move opposite to the previous one
+        opposite_m = tuple(-i for i in self.move_vector)
+        moves.remove(opposite_m)
+
+        for move in moves:
+            #calculate distance between possible new position and point train is trying to reach
+            new_pos = self.new_position(self.train_position, move, 1) 
+            distance = self.distance_to_point(new_pos , point)
+
+            #determine available coordinates
+            available_positions = self.available_grid_coordinates()
+            head_positions = self.around_head()
+
+            #check if wanted move does not move onto unavailable position
+            if tuple(new_pos) in available_positions:
+                    #differentiates possible positions form safe positions
+                    possible_moves.append(move)
+                    if tuple(new_pos) not in head_positions:
+                        possible_safe_moves.append(move)
+                    #check if move brings closer to the wanted point than previous move
+                    if distance < shortest_distance:
+                        shortest_distance = distance
+                        best_move = move 
+                        if tuple(new_pos) not in head_positions:
+                            best_safe_move = move
+                    if distance == shortest_distance:
+                        other_possibility.append(move)
+                        if tuple(new_pos) not in head_positions:
+                            other_safe_possibility.append(move)
+        
+        #determine distance if turning around
+        if point == self.delivery_zone['position']:
+            turn_x = self.x_train_position + opposite_m[0] * self.cell_size
+            turn_y = self.y_train_position + opposite_m[1] * self.cell_size
+            turn_around = self.distance_to_point((turn_x, turn_y), point)
+
+            #check if turning around would be the best choice
+            if distance > turn_around:
+                if len(other_safe_possibility) > 0:
+                    if len(other_safe_possibility) == 1:
+                        best_safe_move = other_safe_possibility[0]
+                    else:
+                        direction = random.randint(0, len(other_safe_possibility)-1)
+                        best_safe_move = other_safe_possibility[direction]
+                elif len(other_possibility) > 0:
+                    if len(other_possibility) == 1:
+                        best_move = other_possibility[0]
+                    else:
+                        direction = random.randint(0, len(other_possibility)-1)
+                        best_move = other_possibility[direction]
+        
+        if best_move == best_safe_move:
+            final_move = best_move
+        elif best_safe_move is not None:
+            final_move = best_safe_move 
+        elif len(other_safe_possibility) > 0:
+            if len(other_safe_possibility) == 1:
+                final_move = other_safe_possibility[0]
+            else:
+                direction = random.randint(0, len(other_safe_possibility)-1)
+                final_move = other_safe_possibility[direction]
+        elif len(other_possibility) > 0:
+            if len(other_possibility) == 1:
+                final_move = other_possibility[0]
+            else:
+                direction = random.randint(0, len(other_possibility)-1)
+                final_move = other_possibility[direction]
+        
+        if final_move is None:
+            return Move.turn_right(move)
+        else:
+            return final_move
+                      
     def close_to_delivery(self):
         """
         Determines if the train is close to the delivery zone when it is trying to go towards a passenger
@@ -262,17 +480,15 @@ class Agent(BaseAgent):
         IN: None
         OUT: Boolean
         """
-
-        train_pos = self.all_trains[self.nickname]["position"]
+        self.positions()
 
         #distance to delivery position
-        delivery_pos = self.delivery_zone['position']
-        distance_to_delivery = self.distance_to_point(train_pos, delivery_pos)
+        distance_to_delivery = self.distance_to_point(self.train_position, self.delivery_zone_pos)
         if distance_to_delivery < 80 and len(self.all_trains[self.nickname]['wagons'])>=2: #80 is arbitrary, 2 just makes sense in practice
             return True
         return False
     
-    def on_the_way(self):
+    def passenger_on_way(self):
         """
         Determine if there is a passenger near the train when he is moving towards the delivery zone
         
@@ -290,9 +506,52 @@ class Agent(BaseAgent):
         moves = [Move.LEFT.value, Move.DOWN.value, Move.UP.value,  Move.RIGHT.value]
         for move in moves:
             pos_of_move = self.new_position(self.train_position, move, 1)
-            if list(pos_of_move) == path:
-                #print("Move:", Move(move))
+            if pos_of_move == path:
                 return Move(move)
+
+    def delivery_donut(self):
+        """
+        The ULTIMATE strategy :). Blocks other players from delivering passenger by surrounding the delivery zone
+        
+        IN: None
+        OUT: Move
+        """
+        self.positions()
+
+        target_pos = (self.x_delivery_position-self.cell_size, self.y_delivery_position)
+        path = self.path_to_point(target_pos)
+        move = self.get_direction(path)
+        launch_circling = False
+        delivery_spots = self.zone_around_delivery()
+
+        if tuple(self.train_position) in delivery_spots:
+            launch_circling = True
+        
+        if target_pos == tuple(self.train_position):
+            return Move.UP
+        
+        if launch_circling:
+            if self.y_train_position == (self.y_delivery_position - self.cell_size):
+                move = Move.RIGHT
+                if self.x_train_position == (self.delivery_zone["width"] + self.x_delivery_position):
+                    move = Move.DOWN
+            
+            if self.y_train_position == (self.y_delivery_position + self.delivery_zone["height"]):
+                move = Move.LEFT
+                if self.x_train_position == self.x_delivery_position:
+                    move = Move.UP
+            
+            if self.x_train_position == (self.x_delivery_position + self.delivery_zone['width']):
+                move = Move.DOWN
+                if self.y_train_position == (self.y_delivery_position + self.delivery_zone['height']):
+                    move = Move.LEFT
+            
+            if self.x_train_position == self.y_delivery_position:
+                move = Move.UP
+                if self.y_train_position == (self.y_delivery_position - self.cell_size):
+                    move = Move.RIGHT
+
+        return move
 
     def get_move(self):
         """
@@ -302,6 +561,94 @@ class Agent(BaseAgent):
         OUT: Move
         """
         self.positions()
+
+        #determine current maximum score
+        max_score = 0
+        if self.best_scores:
+            for train in self.all_trains:
+                if train in self.best_scores:
+                    if train == self.nickname:
+                        continue
+                    if self.best_scores[train] > max_score:
+                        max_score = self.best_scores[train]
+        delivery_pos_on_edge = False
+        if (self.x_delivery_position == 0) or (self.y_delivery_position == 0) \
+        or (self.x_delivery_position == self.game_width) or (self.y_delivery_position == self.game_height):
+            delivery_pos_on_edge = True
+
+        DELIVER = 0
+        if len(self.all_trains[self.nickname]['wagons']) > 0:
+            DELIVER = 1
+
+        if self.best_scores and self.nickname in self.best_scores:
+            if (self.best_scores[self.nickname]> (max_score + 10)) and  (len(self.all_trains[self.nickname]['wagons']) < self.delivery_zone_perimeter) and not delivery_pos_on_edge :
+                DELIVER=0
+        
+        if DELIVER == 0:
+            close_to_delivery = False
+            if not self.best_scores:
+                close_to_delivery = self.close_to_delivery()
+
+            if close_to_delivery:
+                goal = self.delivery_zone_pos
+                path = self.path_to_point(goal)
+            else:
+                goal = self.closest_passenger()
+                path = self.path_to_point(goal)
+        
+        else:
+            if len(self.all_trains[self.nickname]['wagons']) > 4:
+                goal = self.delivery_zone_pos
+                path = self.path_to_point(goal)
+            passenger_on_way = self.passenger_on_way()
+            if passenger_on_way:
+                goal = self.closest_passenger()
+                path = self.path_to_point(goal)
+            else:
+                goal = self.delivery_zone_pos
+                path = self.path_to_point(goal)
+
+        ultimate_strat = False
+        
+        if self.best_scores and (self.nickname in self.best_scores) \
+        and not delivery_pos_on_edge:
+            if self.best_scores[self.nickname] > (max_score + 10):
+                ultimate_strat = True
+                if len(self.all_trains[self.nickname]['wagons']) == (self.delivery_zone_perimeter - 1):
+                    print("Drop")
+                    self.network.send_drop_wagon_request()
+                if len(self.all_trains[self.nickname]['wagons']) == (self.delivery_zone_perimeter - 2):
+                    move = self.delivery_donut()
+                    print("ULTIMATE", move)
+                    return move
+                else:
+                    pass
+
+        if ultimate_strat:
+            if self.best_scores[self.nickname]> (max_score + 2):
+                if len(self.all_trains[self.nickname]['wagons']) == (self.delivery_zone_perimeter - 1):
+                        self.network.send_drop_wagon_request()
+                if len(self.all_trains[self.nickname]['wagons']) == (self.delivery_zone_perimeter - 2):
+                    move = self.delivery_donut() 
+                    print("ULTIMATE MOVE", move)
+                    return move 
+            else:
+                ultimate_strat = False
+
+        if len(self.all_trains[self.nickname]['wagons'])>=15:
+                goal = self.delivery_zone_pos
+                path = self.path_to_point(goal)
+
+        if path:
+            move = self.get_direction(path)
+            print("PATH MOVE", Move(move))
+        else:
+            move = self.other_move(goal)
+            print("OTHER MOVE", Move(move))
+
+        return Move(move)
+
+        """self.positions()
         DELIVER = 0
 
         #determine if train is long enough to go deliver passengers
@@ -310,31 +657,29 @@ class Agent(BaseAgent):
 
         if DELIVER == 0:
             passenger_pos = self.closest_passenger()
-            path = self.path_to_point(passenger_pos)
+            goal = passenger_pos
+            path = self.path_to_point(goal)
         
         else:
             passenger_on_way = self.on_the_way()
             #check if train is to long
             if len(self.all_trains[self.nickname]['wagons'])>=7:
-                print("TOO LONG")
-                path = self.path_to_point(self.delivery_zone_pos)  
+                goal = self.delivery_zone_pos
+                path = self.path_to_point(goal)  
             elif passenger_on_way:
-                print("Passenger on the way")
                 passenger_pos = self.closest_passenger()
-                path = self.path_to_point(passenger_pos)
+                goal = passenger_pos
+                path = self.path_to_point(goal)
             else:
-                "delivery zone"
-                path = self.path_to_point(self.delivery_zone_pos) 
+                goal = self.delivery_zone_pos
+                path = self.path_to_point(goal) 
 
         if path:
-            print("path")
             move = self.get_direction(list(path))
         else:
-            print("AAAAVOOOID OBSTACCCCLE")
-            move = self.avoid_wall()
-            print("Move", Move(move))
+            move = self.other_move(goal)
 
         return Move(move) 
-
+"""
         
 
