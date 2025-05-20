@@ -493,7 +493,6 @@ class Agent(BaseAgent):
                             target_score=self.all_trains[train]["score"]
                             target_train=train
                 if self.all_trains[train]["score"]:
-
                     if target_score>30:
                         move=self.path_to_point(self.all_trains[target_train]["position"]) #targets the train with a high score if 
                     # our train just died and the score is high. Does not activate if the ultimate strategy is on
