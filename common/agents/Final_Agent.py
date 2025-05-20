@@ -45,7 +45,7 @@ class Agent(BaseAgent):
         self.move_vector = self.all_trains[self.nickname]["direction"]
         self.previous_move = Move(tuple(self.move_vector))
 
-        #delivery zone coordinates
+        #delivery zone information
         self.delivery_zone_pos = self.delivery_zone['position']
         self.x_delivery_position = self.delivery_zone['position'][0]
         self.y_delivery_position = self.delivery_zone['position'][1]
@@ -94,13 +94,12 @@ class Agent(BaseAgent):
         passenger_positions = []
 
         #create list with current available passengers
-        for i in range(len(self.passengers)):
-            passenger_positions.append(self.passengers[i]['position'])
-        closest_distance = float('inf')
+        passenger_positions = [passenger['position'] for passenger in self.passengers]
 
+        closest_distance = float('inf')
         for pos in passenger_positions:
             distance = self.distance_to_point(self.train_position, pos)
-            #update closest passenger coordinates if distance is smaller than the on of the previous closest passenger
+            #update closest passenger coordinates if distance is smaller
             if distance < closest_distance:
                 closest_distance = distance
                 closest_passenger = pos
@@ -111,44 +110,64 @@ class Agent(BaseAgent):
         """
         Determines closest point within delivery zone train can go to
         
-        IN:
-        OUT:
+        IN: None
+        OUT: (x,y) coordinates of closest delivery zone point
         """
         closest_delivery_point = (0,0)
         min_distance = float('inf')
-        delivery_zone = self.delivery_zone()
-        for point in delivery_zone:
-            distance = self.distance_to_point(self.train_position,point)
-            if distance < min_distance:
-                min_distance = distance
-                closest_delivery_point = point
 
-        return closest_delivery_point
+        #loop through all delivery zone points
+        for i in range(self.delivery_zone['height']//self.cell_size):
+            for j in range(self.delivery_zone['width']//self.cell_size):
+                x_position = self.x_delivery_position + i*self.cell_size
+                y_position = self.y_delivery_position + j*self.cell_size
+                point = (x_position, y_position)
+                distance = self.distance_to_point(self.train_position, point)
+
+                if distance < min_distance:
+                    min_distance = distance
+                    closest_delivery_point = point
+        print(closest_delivery_point)
+        return tuple(closest_delivery_point)
      
-    def neighbor_positions(self, current_point, grid_with_obstacles):
+    def get_neighbors(self, current_point, grid_with_obstacles):
+        """
+        Determine coordinates neighboring current point
+        
+        IN: coordinates of point, grid with costs
+        OUT: available neighbor positions
+        """
+
         self.positions()
         neighbor_positions = []
         for move in self.moves:
-            #find neighboring pos
             x_neighbor_pos = current_point[0] + move[0]*self.cell_size
             y_neighbor_pos = current_point[1] + move[1]*self.cell_size
+            #check if neighboring position is within bounds
             if 0 <= (x_neighbor_pos // self.cell_size) < len(grid_with_obstacles[0]) and 0<= (y_neighbor_pos // self.cell_size) < len(grid_with_obstacles):
                 if grid_with_obstacles[y_neighbor_pos // self.cell_size][x_neighbor_pos // self.cell_size] != self.OCCUPIED:
                     neighbor_positions.append((x_neighbor_pos, y_neighbor_pos))
+
         return neighbor_positions
 
     def grid_with_obstacles(self):
-
+        """
+        Generate grid with costs of cells
+        
+        IN: None
+        OUT: list of list containing cost of going on each cell
+        """
         self.positions()
+
+        #reset grid
         grid_coordinates = []
 
-        
-
+        #determine pos train would be on if it moved backwards
         backward_train_position_x = self.all_trains[self.nickname]["position"][0]-self.move_vector[0]*self.cell_size
         backward_train_position_y = self.all_trains[self.nickname]["position"][1]-self.move_vector[1]*self.cell_size
         backward_train_position = (backward_train_position_x, backward_train_position_y)
         
-
+        #determine positions to avoid 
         train_wagon_coordinates = []
         around_head_coordinates = []
         for train in self.all_trains:
@@ -157,16 +176,16 @@ class Agent(BaseAgent):
             for wagon_pos in self.all_trains[train]["wagons"]: 
                 train_wagon_coordinates.append(tuple(wagon_pos))
 
+            #avoid making perimeter around own train unavailable
             if train == self.nickname:
                continue
             else:
                 for move in self.moves:
-                   precaution_position=self.new_position(train_pos, move, 1)
+                   precaution_position=self.new_position(train_pos, move)
                    #avoids duplicates
                    if precaution_position not in around_head_coordinates:
                         around_head_coordinates.append(precaution_position)
         
-
         #fill in grid coordinates
         for y in range(0, self.game_height, self.cell_size):
             grid_coordinates.append([])
@@ -224,12 +243,10 @@ class Agent(BaseAgent):
         # Reset head positions
         head_positions=[]
 
-
         for train in self.all_trains:
             #avoid making perimeter around own head unavailable
             if train == self.nickname:
                continue
-
             else:
                 head_position = tuple(self.all_trains[train]["position"])
                 #avoids duplicates
@@ -240,6 +257,7 @@ class Agent(BaseAgent):
                    #avoids duplicates
                    if precaution_position not in head_positions:
                         head_positions.append(precaution_position)
+
         return head_positions
 
     def delivery_zone(self):
@@ -251,45 +269,52 @@ class Agent(BaseAgent):
         """
 
         self.positions()
+
+        #reset delivery points
         delivery_points=[]
-        #this function converts the given data to all positions contained in the delivery zone
 
         for i in range(self.delivery_zone['height']//self.cell_size):
             for j in range(self.delivery_zone['width']//self.cell_size):
-
-                x_position= self.x_delivery_position+i*self.cell_size
-                y_position = self.y_delivery_position+j*self.cell_size
-
+                x_position = self.x_delivery_position + (i*self.cell_size)
+                y_position = self.y_delivery_position + (j*self.cell_size)
                 delivery_points.append((x_position, y_position))
 
         return delivery_points
 
     def zone_around_delivery(self):
+        """
+        Determines coordinates of cells around delivery zone
+        
+        IN: None
+        OUT: list of tuple
+        """
+        
+        #reset delivery positions
         delivery_zone_list=[]
-        # this function is useful for the "ultimate strategy". It finds the positions of all spots/cells around the delivery zone
-        #the corners are taken care of in the first for loop
 
         for i in range(-1,int(self.delivery_zone['width']/(self.cell_size))+1):
-                x1_position= self.x_delivery_position+i*self.cell_size
-                y1_position = self.y_delivery_position-self.cell_size
+                #positions above delivery zone
+                x1_position = self.x_delivery_position + i*self.cell_size
+                y1_position = self.y_delivery_position - self.cell_size
 
-                x2_position=self.x_delivery_position+i*self.cell_size
-                y2_position=self.y_delivery_position+self.delivery_zone['height']+self.cell_size
-                pos1=(x1_position,y1_position)
-                pos2=(x2_position,y2_position)
-                delivery_zone_list.append(pos1)
-                delivery_zone_list.append(pos2)
+                #positions below delivery zone
+                x2_position = self.x_delivery_position + i*self.cell_size
+                y2_position = self.y_delivery_position + self.delivery_zone['height'] + self.cell_size
+
+                delivery_zone_list.append((x1_position,y1_position))
+                delivery_zone_list.append((x2_position,y2_position))
 
         for j in range(0,int(self.delivery_zone['height']/(self.cell_size))):
-                x1_position= self.x_delivery_position-self.cell_size
-                y1_position = self.y_delivery_position+j*self.cell_size
+                #positions to the left of the delivery zone
+                x1_position = self.x_delivery_position - self.cell_size
+                y1_position = self.y_delivery_position + j*self.cell_size
 
-                x2_position=self.x_delivery_position+self.delivery_zone['width']
-                y2_position=self.y_delivery_position+j*self.cell_size
-                pos1=(x1_position,y1_position)
-                pos2=(x2_position,y2_position)
-                delivery_zone_list.append(pos1)
-                delivery_zone_list.append(pos2)
+                #positions to the right of the delivery zone
+                x2_position = self.x_delivery_position + self.delivery_zone['width']
+                y2_position = self.y_delivery_position + j*self.cell_size
+
+                delivery_zone_list.append((x1_position,y1_position))
+                delivery_zone_list.append((x2_position,y2_position))
 
         return delivery_zone_list
 
@@ -321,7 +346,6 @@ class Agent(BaseAgent):
             # chooses node with lowest cost
             points_to_evaluate.sort(key=lambda node: node.total_cost)
             current_point = points_to_evaluate.pop(0)
-            #current_point = min(points_to_evaluate)##############
 
             #skip if already evaluated
             if current_point in evaluated_points:
@@ -341,15 +365,12 @@ class Agent(BaseAgent):
             #points_to_evaluate.remove(current_point)
             evaluated_points.add(current_point)
 
-            for neighbor_pos in self.neighbor_positions(current_point.position, grid):
-                #neighbor_point = Node(neighboring_pos, previous_point=current_point)
-                #avoid duplicate assessing of points
-                #if neighbor_point in evaluated_points:
-                #    continue
+            for neighbor_pos in self.get_neighbors(current_point.position, grid):
 
                 x,y = neighbor_pos
                 cost_of_move = grid[y//self.cell_size][x//self.cell_size]
 
+                #update costs
                 neighbor_point = Node(neighbor_pos, previous_point=current_point)
                 neighbor_point.real_cost = current_point.real_cost + cost_of_move
                 neighbor_point_pos = neighbor_point.position
@@ -361,7 +382,6 @@ class Agent(BaseAgent):
                     if neighbor_point == point_to_evaluate and neighbor_point.real_cost >= point_to_evaluate.real_cost:
                         skip_neighbor = True
                         break
-                        #continue
                 if not skip_neighbor:
                     points_to_evaluate.append(neighbor_point)
     
@@ -393,8 +413,8 @@ class Agent(BaseAgent):
 
         for move in moves:
             #calculate distance between possible new position and point train is trying to reach
-            new_pos = self.new_position(self.train_position, move, 1) 
-            distance = self.distance_to_point(new_pos , point)
+            new_pos = self.new_position(self.train_position, move) 
+            distance = self.distance_to_point(new_pos, point)
 
             #determine available coordinates
             available_positions = self.available_grid_coordinates()
@@ -438,6 +458,7 @@ class Agent(BaseAgent):
                         direction = random.randint(0, len(other_possibility)-1)
                         best_move = other_possibility[direction]
         
+        #choose best move
         if best_move == best_safe_move:
             final_move = best_move
         elif best_safe_move is not None:
@@ -499,6 +520,8 @@ class Agent(BaseAgent):
 
     def get_direction(self, next_pos):
         """
+        Determines move to choose depending on next coordinate to go onto
+        
         IN: tuple of coordinates (int, int)
         OUT: move (eg. Move.UP, ...)
         """
@@ -645,7 +668,7 @@ class Agent(BaseAgent):
             move = self.other_move(goal)
 
 
-        if self.best_scores:
+        """        if self.best_scores:
             if self.all_trains[self.nickname]["score"] == 0:
                 max_actual_score = 0
                 #find the max current score of any train.
@@ -656,20 +679,21 @@ class Agent(BaseAgent):
                         if self.all_trains[train]["score"] > max_actual_score:
                             target_score = self.all_trains[train]["score"]
                             target_train = train
-                if self.all_trains[train]["score"]:
-                    #target train with high score if our train just died and score difference with opponent is high
-                    if target_score > 30:
-                        move = self.path_to_point(self.all_trains[target_train]["position"]) 
+                #if self.all_trains[train]["score"]:
+                #    #target train with high score if our train just died and score difference with opponent is high
+                #    if target_score > 1 and not self.ultimate_strategy:
+                #        move = self.path_to_point(self.all_trains[target_train]["position"]) """
                         
         if self.ultimate_strategy:
             if self.best_scores[self.nickname]>max_score+2:#continues the strategy even if some of the lead is lost, up to +2
                 if len(self.all_trains[self.nickname]['wagons']) == (self.delivery_zone_perimeter - 1):
-                        self.network.send_drop_wagon_request()
+                    self.network.send_drop_wagon_request()
                 if len(self.all_trains[self.nickname]['wagons']) == (self.delivery_zone_perimeter - 2):
-                    move=self.delivery_donut() #activates the strategy
+                    move = self.delivery_donut() #activates the strategy
             else:
                 self.ultimate_strategy = False #go back to normal mode if lead is lost
       
+        print(self.closest_delivery_zone_point(), self.delivery_zone_pos)
         return Move(move)
 
 
