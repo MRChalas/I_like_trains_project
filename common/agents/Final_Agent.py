@@ -534,17 +534,24 @@ class Agent(BaseAgent):
         self.positions()
 
         target_pos = (self.x_delivery_position-self.cell_size, self.y_delivery_position)
-        move = Move(self.other_move(target_pos)) #this part is responsible for guiding the train to the delivery zone
-        launch_circling = False #variable to enable/disable the circling around the delivery zone
+
+        #guide train to delivery zone
+        move = Move(self.other_move(target_pos)) 
+
+        #variable to enable/disable the circling around the delivery zone
+        launch_circling = False 
         delivery_spots = self.zone_around_delivery()
 
-        if tuple(self.train_position) in delivery_spots:#checks if the position of the train is on the path of the circling
+        #checks if train position is on circling path 
+        if tuple(self.train_position) in delivery_spots:
             launch_circling = True
         
-        if target_pos == tuple(self.train_position): #the target is just below the top left corner, we need to move up to start
+        #the target is just below the top left corner, we need to move up to start
+        if target_pos == tuple(self.train_position): 
             return Move.UP
         
-        if launch_circling: #this contains all the conditions to force the train to go around the delivery zone
+        #this contains all the conditions to force the train to go around the delivery zone
+        if launch_circling:
             #the conditions are here to turn at the right moment.
             if self.y_train_position == (self.y_delivery_position - self.cell_size):
                 move = Move.RIGHT
@@ -574,11 +581,11 @@ class Agent(BaseAgent):
         Contains the decision making : grabbing passengers, delivering them, or activating the ultimate strategy
         
         IN: None
-        OUT: Move
+        OUT: Move(eg. Move.UP,...)
         """
         self.positions()
 
-        #determine current maximum score for the ultimate strategy (which train has the highest score except our own)
+        #determine current opponent maximum score for the ultimate strategy 
         max_score = 0
         if self.best_scores:
             for train in self.all_trains:
@@ -588,7 +595,8 @@ class Agent(BaseAgent):
                     if self.best_scores[train] > max_score:
                         max_score = self.best_scores[train]
         delivery_pos_on_edge = False
-        #below, we disable the strategy if the delivery zone is on the edge
+
+        #disable ultimate strategy if the delivery zone is on the edge
         if (self.x_delivery_position == 0) or (self.y_delivery_position == 0) \
         or (self.x_delivery_position == self.game_width) or (self.y_delivery_position == self.game_height):
             delivery_pos_on_edge = True
@@ -597,21 +605,24 @@ class Agent(BaseAgent):
         if len(self.all_trains[self.nickname]['wagons']) > 0:
             DELIVER = 1
 
-        if self.best_scores and self.nickname in self.best_scores:#disabling delivery if the ultimate strategy is activated
+        #disable delivery if the ultimate strategy is activated
+        if self.best_scores and self.nickname in self.best_scores:
             if (self.best_scores[self.nickname]> (max_score + 9)) and  (len(self.all_trains[self.nickname]['wagons']) < self.delivery_zone_perimeter) and not delivery_pos_on_edge :
                 DELIVER=0
         
         if DELIVER == 0:
             close_to_delivery = False
-            if not self.best_scores:#condition to dodge this part if at the start of the game (otherwise errors pop up)
+            #condition to dodge this part if at the start of the game (otherwise errors pop up)
+            if not self.best_scores:
                 close_to_delivery = self.close_to_delivery()
 
-            if close_to_delivery:#going to the delivery on the way if worth it
+            #go to the delivery zone if close enough to it
+            if close_to_delivery:
                 goal = self.delivery_zone_pos
                 path = self.path_to_point(goal)
             else:
                 goal = self.closest_passenger()
-                path = self.path_to_point(goal) #simply delivering the passengers
+                path = self.path_to_point(goal) #deliver passengers
         
         else:
             if len(self.all_trains[self.nickname]['wagons']) > 4:
@@ -656,9 +667,10 @@ class Agent(BaseAgent):
                             target_score=self.all_trains[train]["score"]
                             target_train=train
                 if self.all_trains[train]["score"]:
+                    #target train with high score if our train just died and score difference with opponent is high
                     if target_score>30:
-                        move=self.path_to_point(self.all_trains[target_train]["position"]) #targets the train with a high score if 
-                    # our train just died and the score is high. Does not activate if the ultimate strategy is on
+                        move=self.path_to_point(self.all_trains[target_train]["position"]) 
+                        
         if self.ultimate_strategy:
             if self.best_scores[self.nickname]>max_score+2:
                 if len(self.all_trains[self.nickname]['wagons'])==self.delivery_zone_perimeter-1:
