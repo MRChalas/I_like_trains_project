@@ -20,9 +20,7 @@ class Node:
     
     def __eq__(self, node):
         #avoid error if type is not the same
-        if not isinstance(node, Node):
-            return False
-        return self.position == node.position
+        return isinstance(node, Node) and self.position == node.position
     
     def __hash__(self):
         return hash(self.position)  # Use position as the hashable attribute
@@ -32,7 +30,7 @@ class Agent(BaseAgent):
         """
         Cordinates which are reused several times throughout the movement choice
         """
-
+        #available moves
         self.moves = [Move.LEFT.value, Move.DOWN.value, Move.UP.value, Move.RIGHT.value]
 
         #train coordinates
@@ -53,7 +51,7 @@ class Agent(BaseAgent):
 
         #grid costs
         self.AVAILABLE = 0
-        self.AVOID = 1000
+        self.AVOID = 100000
         self.OCCUPIED = float('inf')
 
     def distance_to_point(self, current_point:tuple, new_point:tuple):
@@ -109,25 +107,28 @@ class Agent(BaseAgent):
         """
         Determines closest point within delivery zone train can go to
         
-        IN:
-        OUT:
+        IN: None
+        OUT: (x,y) coordinates of closest delivery zone point
         """
         closest_delivery_point = (0,0)
         min_distance = float('inf')
-        delivery_zone = self.delivery_zone()
-        for point in delivery_zone:
-            distance = self.distance_to_point(self.train_position,point)
-            if distance < min_distance:
-                min_distance = distance
-                closest_delivery_point = point
 
+        for i in range(self.delivery_zone['height']//self.cell_size):
+            for j in range(self.delivery_zone['width']//self.cell_size):
+                x_position= self.x_delivery_position+i*self.cell_size
+                y_position = self.y_delivery_position+j*self.cell_size
+                point = (x_position, y_position)
+                distance = self.distance_to_point(self.train_position, point)
+
+                if distance < min_distance:
+                    min_distance = distance
+                    closest_delivery_point = point
         return closest_delivery_point
      
     def neighbor_positions(self, current_point, grid_with_obstacles):
         self.positions()
-        moves = [Move.LEFT.value, Move.DOWN.value, Move.UP.value,  Move.RIGHT.value]
         neighbor_positions = []
-        for move in moves:
+        for move in self.moves:
             #find neighboring pos
             x_neighbor_pos = current_point[0] + move[0]*self.cell_size
             y_neighbor_pos = current_point[1] + move[1]*self.cell_size
@@ -159,8 +160,8 @@ class Agent(BaseAgent):
             if train == self.nickname:
                continue
             else:
-                moves = [Move.LEFT.value, Move.DOWN.value, Move.UP.value,  Move.RIGHT.value]
-                for move in moves:
+                
+                for move in self.moves:
                    precaution_position=self.new_position(train_pos, move, 1)
                    #avoids duplicates
                    if precaution_position not in around_head_coordinates:
@@ -238,8 +239,7 @@ class Agent(BaseAgent):
                 #avoids duplicates
                 if head_position not in head_positions:
                     head_positions.append(head_position)
-                moves = [Move.LEFT.value, Move.DOWN.value, Move.UP.value,  Move.RIGHT.value]
-                for move in moves:
+                for move in self.moves:
                    precaution_position=self.new_position(head_position, move, 1)
                    #avoids duplicates
                    if precaution_position not in head_positions:
@@ -376,7 +376,7 @@ class Agent(BaseAgent):
         self.positions()
 
         #reset movement variables
-        moves = [Move.LEFT.value, Move.DOWN.value, Move.UP.value,  Move.RIGHT.value]
+        moves = self.moves
         shortest_distance = float('inf')
         best_move = None
         best_safe_move = None
@@ -488,8 +488,7 @@ class Agent(BaseAgent):
         return False
 
     def get_direction(self, path):
-        moves = [Move.LEFT.value, Move.DOWN.value, Move.UP.value,  Move.RIGHT.value]
-        for move in moves:
+        for move in self.moves:
             pos_of_move = self.new_position(self.train_position, move, 1)
             if pos_of_move == path:
                 return Move(move)
@@ -504,8 +503,7 @@ class Agent(BaseAgent):
         self.positions()
 
         target_pos = (self.x_delivery_position-self.cell_size, self.y_delivery_position)
-        path = self.path_to_point(target_pos)
-        move = self.get_direction(path)
+        move = Move(self.other_move(target_pos))
         launch_circling = False
         delivery_spots = self.zone_around_delivery()
 
@@ -548,6 +546,7 @@ class Agent(BaseAgent):
         self.positions()
 
         #determine current maximum score
+
         max_score = 0
         if self.best_scores:
             for train in self.all_trains:
@@ -575,7 +574,7 @@ class Agent(BaseAgent):
                 close_to_delivery = self.close_to_delivery()
 
             if close_to_delivery:
-                goal = self.delivery_zone_pos
+                goal = self.closest_delivery_zone_point()
                 path = self.path_to_point(goal)
             else:
                 goal = self.closest_passenger()
@@ -583,14 +582,14 @@ class Agent(BaseAgent):
         
         else:
             if len(self.all_trains[self.nickname]['wagons']) > 4:
-                goal = self.delivery_zone_pos
+                goal = self.closest_delivery_zone_point()
                 path = self.path_to_point(goal)
             passenger_on_way = self.passenger_on_way()
             if passenger_on_way:
                 goal = self.closest_passenger()
                 path = self.path_to_point(goal)
             else:
-                goal = self.delivery_zone_pos
+                goal = self.closest_delivery_zone_point()
                 path = self.path_to_point(goal)
 
         ultimate_strat = False
@@ -620,10 +619,11 @@ class Agent(BaseAgent):
             else:
                 ultimate_strat = False
 
+        
         if len(self.all_trains[self.nickname]['wagons'])>=15:
-                goal = self.delivery_zone_pos
+                goal = self.closest_delivery_zone_point()
                 path = self.path_to_point(goal)
-
+                move = self.get_direction(path)
         if path:
             move = self.get_direction(path)
             print("PATH MOVE", Move(move))
