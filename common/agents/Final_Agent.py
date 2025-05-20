@@ -627,9 +627,9 @@ class Agent(BaseAgent):
         else:
             if len(self.all_trains[self.nickname]['wagons']) > 4:
                 goal = self.delivery_zone_pos
-                path = self.path_to_point(goal)
+                path = self.path_to_point(goal) #goes back if too long
             passenger_on_way = self.passenger_on_way()
-            if passenger_on_way:
+            if passenger_on_way:#takes the passengers that are close to the path
                 goal = self.closest_passenger()
                 path = self.path_to_point(goal)
             else:
@@ -639,17 +639,19 @@ class Agent(BaseAgent):
         
         if self.best_scores and (self.nickname in self.best_scores) \
         and not delivery_pos_on_edge and len(self.all_trains)!=4 and len(self.all_trains)!=3:
-            if self.best_scores[self.nickname] > (max_score + 9):
+            #activating the strategy if we are alone or with 2 players only
+            if self.best_scores[self.nickname] > (max_score + 9):#activates with a lead of 10 points minimum
                 if len(self.all_trains[self.nickname]['wagons']) == (self.delivery_zone_perimeter - 1) and not self.ultimate_strategy:
-                    self.network.send_drop_wagon_request()
-                if len(self.all_trains[self.nickname]['wagons']) == (self.delivery_zone_perimeter - 2):
-                    move = self.delivery_donut()
+                    self.network.send_drop_wagon_request()#drops a wagon to get the exact wagons compared to the perimeter
+                if len(self.all_trains[self.nickname]['wagons']) == (self.delivery_zone_perimeter - 2):#the -2 is considering the head
+                    #the head is not a wagon but counts in terms of length! We have a 1 cell margin to ensure we do not die.
+                    move = self.delivery_donut()#directly circles if the amount of wagons is perfect
                     return move
                 else:
                     pass
-            self.ultimate_strategy=True
+            self.ultimate_strategy=True #activates the attribute so that the strategy continues even if some of the lead is lost.
 
-        if len(self.all_trains[self.nickname]['wagons'])>=6 and not self.ultimate_strategy:
+        if len(self.all_trains[self.nickname]['wagons'])>=6 and not self.ultimate_strategy:#ensuring we are never too long
             goal = self.delivery_zone_pos
             path = self.path_to_point(goal)
         if path:
@@ -661,7 +663,9 @@ class Agent(BaseAgent):
         if self.best_scores:
             if self.all_trains[self.nickname]["score"]==0:
                 max_actual_score=0
-                for train in self.all_trains:
+                for train in self.all_trains:#the code belows find the max current score of any train.
+                    if train==self.nickname:
+                        continue
                     if self.all_trains[train]["score"]:
                         if self.all_trains[train]["score"]>max_actual_score:
                             target_score=self.all_trains[train]["score"]
@@ -672,15 +676,12 @@ class Agent(BaseAgent):
                         move=self.path_to_point(self.all_trains[target_train]["position"]) 
                         
         if self.ultimate_strategy:
-            if self.best_scores[self.nickname]>max_score+2:
-                if len(self.all_trains[self.nickname]['wagons'])==self.delivery_zone_perimeter-1:
-                        self.network.send_drop_wagon_request()
+            if self.best_scores[self.nickname]>max_score+2:#continues the strategy even if some of the lead is lost, up to +2
                 if len(self.all_trains[self.nickname]['wagons'])==self.delivery_zone_perimeter-2:
-                    move=self.delivery_donut()  
+                    move=self.delivery_donut() #activates the strategy
             else:
-                self.ultimate_strategy=False
+                self.ultimate_strategy=False #the lead was lost, we go back to normal mode
       
-          
         
         return Move(move)
 
