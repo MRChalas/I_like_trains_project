@@ -599,11 +599,9 @@ class Agent(BaseAgent):
             if self.best_scores[self.nickname] > (max_score + 10):
                 ultimate_strat = True
                 if len(self.all_trains[self.nickname]['wagons']) == (self.delivery_zone_perimeter - 1):
-                    print("Drop")
                     self.network.send_drop_wagon_request()
                 if len(self.all_trains[self.nickname]['wagons']) == (self.delivery_zone_perimeter - 2):
                     move = self.delivery_donut()
-                    print("ULTIMATE", move)
                     return move
                 else:
                     pass
@@ -614,7 +612,6 @@ class Agent(BaseAgent):
                         self.network.send_drop_wagon_request()
                 if len(self.all_trains[self.nickname]['wagons']) == (self.delivery_zone_perimeter - 2):
                     move = self.delivery_donut() 
-                    print("ULTIMATE MOVE", move)
                     return move 
             else:
                 ultimate_strat = False
@@ -626,10 +623,8 @@ class Agent(BaseAgent):
                 move = self.get_direction(path)
         if path:
             move = self.get_direction(path)
-            print("PATH MOVE", Move(move))
         else:
             move = self.other_move(goal)
-            print("OTHER MOVE", Move(move))
 
         return Move(move)
 

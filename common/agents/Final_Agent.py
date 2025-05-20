@@ -2,10 +2,10 @@ import random
 from common.base_agent import BaseAgent
 from common.move import Move
 
-# 127.0.0.1
-# 128.179.154.221
+# Local: 127.0.0.1
+# Server: 128.179.154.221
 # Student scipers, will be automatically used to evaluate your code
-SCIPERS = ["390899", "Ton sciper"]
+SCIPERS = ["390899", "398584"]
 
 class Node:
     """
@@ -68,7 +68,7 @@ class Agent(BaseAgent):
 
         return abs(current_point[0] - point[0]) + abs(current_point[1] - point[1])
 
-    def new_position(self, position:tuple, move: tuple, steps = 1):
+    def new_position(self, position:tuple, move:tuple, steps = 1):
         """
         Determines new train position after n moves
         
@@ -311,7 +311,7 @@ class Agent(BaseAgent):
 
         return delivery_zone_list
 
-    def path_to_point(self, goal: tuple):
+    def path_to_point(self, goal:tuple):
         """
         A* path finding algorithm to determine best move to choose
         
@@ -380,7 +380,7 @@ class Agent(BaseAgent):
     
         return None #No path available
 
-    def other_move(self, point: tuple):
+    def other_move(self, point:tuple):
         """
         Determines direction to take to get to closest passenger
 
@@ -486,7 +486,7 @@ class Agent(BaseAgent):
 
         #distance to delivery position
         distance_to_delivery = self.distance_to_point(self.train_position, self.delivery_zone_pos)
-        if distance_to_delivery < 80 and len(self.all_trains[self.nickname]['wagons'])>=1: #80 is arbitrary, 1 just makes sense in practice
+        if distance_to_delivery < 80 and len(self.all_trains[self.nickname]['wagons']) >= 1: #80 is arbitrary, 1 just makes sense in practice
             return True
         return False
     
@@ -500,12 +500,13 @@ class Agent(BaseAgent):
         """
 
         closest_passenger = self.closest_passenger()
-        distance_to_passenger = abs(closest_passenger[0] - self.x_train_position) + abs(closest_passenger[1] - self.y_train_position)
-        radius=100#default value just in case
-        if len(self.all_trains)==1 or len(self.all_trains)==2:
-            radius=100
-        if len(self.all_trains)==3 or len(self.all_trains)==4:
-            radius=50
+        distance_to_passenger = self.distance_to_point(closest_passenger, self.train_position) 
+        radius = 100 #default value just in case
+        #adapt depending on number of players
+        if len(self.all_trains) == 1 or len(self.all_trains) == 2:
+            radius = 100
+        if len(self.all_trains) == 3 or len(self.all_trains) == 4:
+            radius = 50
         if distance_to_passenger < radius: 
             return True
         return False
@@ -514,11 +515,11 @@ class Agent(BaseAgent):
         """
         Determines move to choose depending on next coordinate to go onto
         
-        IN: tuple (int, int)
+        IN: tuple of coordinates (int, int)
         OUT: move (eg. Move.UP, ...)
         """
         for move in self.moves:
-            pos_of_move = self.new_position(self.train_position, move, 1)
+            pos_of_move = self.new_position(self.train_position, move)
             if pos_of_move == next_pos:
                 return Move(move)
 
@@ -530,10 +531,9 @@ class Agent(BaseAgent):
         IN: None
         OUT: Move
         """
-
         self.positions()
 
-        target_pos = (self.x_delivery_position-self.cell_size, self.y_delivery_position)
+        target_pos = ((self.x_delivery_position - self.cell_size), self.y_delivery_position)
 
         #guide train to delivery zone
         move = Move(self.other_move(target_pos)) 
@@ -608,7 +608,7 @@ class Agent(BaseAgent):
         #disable delivery if the ultimate strategy is activated
         if self.best_scores and self.nickname in self.best_scores:
             if (self.best_scores[self.nickname]> (max_score + 9)) and  (len(self.all_trains[self.nickname]['wagons']) < self.delivery_zone_perimeter) and not delivery_pos_on_edge :
-                DELIVER=0
+                DELIVER = 0
         
         if DELIVER == 0:
             close_to_delivery = False
@@ -618,7 +618,7 @@ class Agent(BaseAgent):
 
             #go to the delivery zone if close enough to it
             if close_to_delivery:
-                goal = self.delivery_zone_pos
+                goal = self.closest_delivery_zone_point()
                 path = self.path_to_point(goal)
             else:
                 goal = self.closest_passenger()
@@ -626,33 +626,34 @@ class Agent(BaseAgent):
         
         else:
             if len(self.all_trains[self.nickname]['wagons']) > 4:
-                goal = self.delivery_zone_pos
+                goal = self.closest_delivery_zone_point()
                 path = self.path_to_point(goal) #goes back if too long
             passenger_on_way = self.passenger_on_way()
-            if passenger_on_way:#takes the passengers that are close to the path
+            #takes the passengers that are close to the path
+            if passenger_on_way:
                 goal = self.closest_passenger()
                 path = self.path_to_point(goal)
             else:
-                goal = self.delivery_zone_pos
+                goal = self.closest_delivery_zone_point()
                 path = self.path_to_point(goal)
 
-        
+        #activating the strategy if we are alone or with 2 players only
         if self.best_scores and (self.nickname in self.best_scores) \
-        and not delivery_pos_on_edge and len(self.all_trains)!=4 and len(self.all_trains)!=3:
-            #activating the strategy if we are alone or with 2 players only
-            if self.best_scores[self.nickname] > (max_score + 9):#activates with a lead of 10 points minimum
+        and not delivery_pos_on_edge and len(self.all_trains)!=4 and len(self.all_trains)!= 3:
+            #activate with a lead of 10 points minimum
+            if self.best_scores[self.nickname] > (max_score + 9):
                 if len(self.all_trains[self.nickname]['wagons']) == (self.delivery_zone_perimeter - 1) and not self.ultimate_strategy:
                     self.network.send_drop_wagon_request()#drops a wagon to get the exact wagons compared to the perimeter
-                if len(self.all_trains[self.nickname]['wagons']) == (self.delivery_zone_perimeter - 2):#the -2 is considering the head
-                    #the head is not a wagon but counts in terms of length! We have a 1 cell margin to ensure we do not die.
-                    move = self.delivery_donut()#directly circles if the amount of wagons is perfect
+                if len(self.all_trains[self.nickname]['wagons']) == (self.delivery_zone_perimeter - 2):#(-2) because head is considered (ensure one cell margin to avoid death)
+                    move = self.delivery_donut()   #circle delivery zone if the amount of wagons is perfect
                     return move
                 else:
                     pass
-            self.ultimate_strategy=True #activates the attribute so that the strategy continues even if some of the lead is lost.
+            self.ultimate_strategy = True #ensure strategy continues even if some of the lead is lost.
 
-        if len(self.all_trains[self.nickname]['wagons'])>=6 and not self.ultimate_strategy:#ensuring we are never too long
-            goal = self.delivery_zone_pos
+        #ensure we are never too long
+        if len(self.all_trains[self.nickname]['wagons']) >= 6 and not self.ultimate_strategy:
+            goal = self.closest_delivery_zone_point()
             path = self.path_to_point(goal)
         if path:
             move = self.get_direction(path)
@@ -661,28 +662,28 @@ class Agent(BaseAgent):
 
 
         if self.best_scores:
-            if self.all_trains[self.nickname]["score"]==0:
-                max_actual_score=0
-                for train in self.all_trains:#the code belows find the max current score of any train.
-                    if train==self.nickname:
+            if self.all_trains[self.nickname]["score"] == 0:
+                max_actual_score = 0
+                #find the max current score of any train.
+                for train in self.all_trains:
+                    if train == self.nickname:
                         continue
                     if self.all_trains[train]["score"]:
-                        if self.all_trains[train]["score"]>max_actual_score:
-                            target_score=self.all_trains[train]["score"]
-                            target_train=train
+                        if self.all_trains[train]["score"] > max_actual_score:
+                            target_score = self.all_trains[train]["score"]
+                            target_train = train
                 if self.all_trains[train]["score"]:
                     #target train with high score if our train just died and score difference with opponent is high
-                    if target_score>30:
-                        move=self.path_to_point(self.all_trains[target_train]["position"]) 
+                    if target_score > 30:
+                        move = self.path_to_point(self.all_trains[target_train]["position"]) 
                         
         if self.ultimate_strategy:
             if self.best_scores[self.nickname]>max_score+2:#continues the strategy even if some of the lead is lost, up to +2
-                if len(self.all_trains[self.nickname]['wagons'])==self.delivery_zone_perimeter-2:
-                    move=self.delivery_donut() #activates the strategy
+                if len(self.all_trains[self.nickname]['wagons']) == (self.delivery_zone_perimeter-2):
+                    move = self.delivery_donut() #activates the strategy
             else:
-                self.ultimate_strategy=False #the lead was lost, we go back to normal mode
+                self.ultimate_strategy = False #go back to normal mode if lead is lost
       
-        
         return Move(move)
 
 
