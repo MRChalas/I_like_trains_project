@@ -119,15 +119,15 @@ class Agent(BaseAgent):
         #loop through all delivery zone points
         for i in range(self.delivery_zone['height']//self.cell_size):
             for j in range(self.delivery_zone['width']//self.cell_size):
-                x_position = self.x_delivery_position + i*self.cell_size
-                y_position = self.y_delivery_position + j*self.cell_size
+                x_position = self.x_delivery_position + j*self.cell_size
+                y_position = self.y_delivery_position + i*self.cell_size
                 point = (x_position, y_position)
                 distance = self.distance_to_point(self.train_position, point)
 
                 if distance < min_distance:
                     min_distance = distance
                     closest_delivery_point = point
-        print(closest_delivery_point)
+        
         return tuple(closest_delivery_point)
      
     def get_neighbors(self, current_point, grid_with_obstacles):
@@ -195,10 +195,11 @@ class Agent(BaseAgent):
                 elif (x, y) in train_wagon_coordinates:   
                         grid_coordinates[y // self.cell_size].append(self.OCCUPIED)
                 elif (x,y) in around_head_coordinates:
-                    grid_coordinates[y // self.cell_size].append(self.AVOID)
+                    grid_coordinates[y // self.cell_size].append(self.OCCUPIED)
                 else:
                     grid_coordinates[y // self.cell_size].append(self.AVAILABLE)
 
+    
         return grid_coordinates
 
     def available_grid_coordinates(self):
@@ -260,7 +261,7 @@ class Agent(BaseAgent):
 
         return head_positions
 
-    def delivery_zone(self):
+    def delivery_zone_cells(self):
         """
         Determines positions covered by delivery zone
         
@@ -278,7 +279,6 @@ class Agent(BaseAgent):
                 x_position = self.x_delivery_position + (i*self.cell_size)
                 y_position = self.y_delivery_position + (j*self.cell_size)
                 delivery_points.append((x_position, y_position))
-
         return delivery_points
 
     def zone_around_delivery(self):
@@ -389,14 +389,13 @@ class Agent(BaseAgent):
 
     def other_move(self, point:tuple):
         """
-        Determines direction to take to get to closest passenger
+        Determines direction to take to get o closest passenger
 
         IN: coordinates of the point the train is trying to reach (int, int)
         OUT: best move the train can take (eg: Move.UP, Move.LEFT, ...)
         """
 
         self.positions()
-
         #reset movement variables
         moves = self.moves
         shortest_distance = float('inf')
@@ -410,7 +409,6 @@ class Agent(BaseAgent):
         #remove move opposite to the previous one
         opposite_m = tuple(-i for i in self.move_vector)
         moves.remove(opposite_m)
-
         for move in moves:
             #calculate distance between possible new position and point train is trying to reach
             new_pos = self.new_position(self.train_position, move) 
@@ -432,13 +430,18 @@ class Agent(BaseAgent):
                         best_move = move 
                         if tuple(new_pos) not in head_positions:
                             best_safe_move = move
+                    if point in self.delivery_zone_cells():
+                        if new_pos in self.delivery_zone_cells():
+                            best_move=move
+                            if tuple(new_pos) not in head_positions:
+                                best_safe_move = move
                     if distance == shortest_distance:
                         other_possibility.append(move)
                         if tuple(new_pos) not in head_positions:
                             other_safe_possibility.append(move)
-        
+                    
         #determine distance if turning around
-        if point == self.delivery_zone['position']:
+        if point == self.closest_delivery_zone_point():
             turn_x = self.x_train_position + opposite_m[0] * self.cell_size
             turn_y = self.y_train_position + opposite_m[1] * self.cell_size
             turn_around = self.distance_to_point((turn_x, turn_y), point)
@@ -493,7 +496,7 @@ class Agent(BaseAgent):
 
         #distance to delivery position
         distance_to_delivery = self.distance_to_point(self.train_position, self.delivery_zone_pos)
-        if distance_to_delivery < 80 and len(self.all_trains[self.nickname]['wagons']) >= 1: #80 is arbitrary, 1 just makes sense in practice
+        if distance_to_delivery < 200: #200 is arbitrary
             return True
         return False
     
@@ -513,7 +516,7 @@ class Agent(BaseAgent):
         if len(self.all_trains) == 1 or len(self.all_trains) == 2:
             radius = 100
         if len(self.all_trains) == 3 or len(self.all_trains) == 4:
-            radius = 50
+            radius = 40
         if distance_to_passenger < radius: 
             return True
         return False
@@ -539,7 +542,6 @@ class Agent(BaseAgent):
         OUT: Move
         """
         self.positions()
-
         target_pos = ((self.x_delivery_position - self.cell_size), self.y_delivery_position)
 
         #guide train to delivery zone
@@ -607,9 +609,10 @@ class Agent(BaseAgent):
         if (self.x_delivery_position == 0) or (self.y_delivery_position == 0) \
         or (self.x_delivery_position == self.game_width) or (self.y_delivery_position == self.game_height):
             delivery_pos_on_edge = True
-
+        
         DELIVER = 0
-        if len(self.all_trains[self.nickname]['wagons']) > 0:
+        
+        if len(self.all_trains[self.nickname]['wagons']) > 1:
             DELIVER = 1
 
         #disable delivery if the ultimate strategy is activated
@@ -618,39 +621,40 @@ class Agent(BaseAgent):
                 DELIVER = 0
         
         if DELIVER == 0:
-            close_to_delivery = False
+            close_to_delivery = True
             #condition to dodge this part if at the start of the game (otherwise errors pop up)
             if not self.best_scores:
                 close_to_delivery = self.close_to_delivery()
 
             #go to the delivery zone if close enough to it
-            if close_to_delivery:
+            if close_to_delivery and len(self.all_trains[self.nickname]['wagons'])>0:
                 goal = self.closest_delivery_zone_point()
                 path = self.path_to_point(goal)
             else:
                 goal = self.closest_passenger()
                 path = self.path_to_point(goal) #deliver passengers
-        
         else:
-            if len(self.all_trains[self.nickname]['wagons']) > 4:
-                goal = self.closest_delivery_zone_point()
-                path = self.path_to_point(goal) #goes back if too long
+            
             passenger_on_way = self.passenger_on_way()
             #takes the passengers that are close to the path
             if passenger_on_way:
                 goal = self.closest_passenger()
                 path = self.path_to_point(goal)
+            if len(self.all_trains[self.nickname]['wagons']) > 6:
+                goal = self.closest_delivery_zone_point()
+                path = self.path_to_point(goal) #goes back if too long
             else:
                 goal = self.closest_delivery_zone_point()
                 path = self.path_to_point(goal)
 
         #activating the strategy if we are alone or with 2 players only
         if self.best_scores and (self.nickname in self.best_scores) \
-        and not delivery_pos_on_edge and len(self.all_trains)!=4 and len(self.all_trains)!= 3:
+        and not delivery_pos_on_edge and len(self.all_trains)==2:
             #activate with a lead of 10 points minimum
             if self.best_scores[self.nickname] > (max_score + 9):
                 if len(self.all_trains[self.nickname]['wagons']) == (self.delivery_zone_perimeter - 1) and not self.ultimate_strategy:
-                    self.network.send_drop_wagon_request()#drops a wagon to get the exact wagons compared to the perimeter
+                    if not self.all_trains[self.nickname]['boost_cooldown_active']:#prevents errors in the terminal
+                        self.network.send_drop_wagon_request()#drops a wagon to get the exact wagons compared to the perimeter
                 if len(self.all_trains[self.nickname]['wagons']) == (self.delivery_zone_perimeter - 2):#(-2) because head is considered (ensure one cell margin to avoid death)
                     move = self.delivery_donut()   #circle delivery zone if the amount of wagons is perfect
                     return move
@@ -659,25 +663,38 @@ class Agent(BaseAgent):
             self.ultimate_strategy = True #ensure strategy continues even if some of the lead is lost.
 
         #ensure we are never too long
-        if len(self.all_trains[self.nickname]['wagons']) >= 6 and not self.ultimate_strategy:
-            goal = self.closest_delivery_zone_point()
-            path = self.path_to_point(goal)
+
         if path:
             move = self.get_direction(path)
         else:
             move = self.other_move(goal)
 
+
+        """        if self.best_scores:
+            if self.all_trains[self.nickname]["score"] == 0:
+                max_actual_score = 0
+                #find the max current score of any train.
+                for train in self.all_trains:
+                    if train == self.nickname:
+                        continue
+                    if self.all_trains[train]["score"]:
+                        if self.all_trains[train]["score"] > max_actual_score:
+                            target_score = self.all_trains[train]["score"]
+                            target_train = train
+                #if self.all_trains[train]["score"]:
+                #    #target train with high score if our train just died and score difference with opponent is high
+                #    if target_score > 1 and not self.ultimate_strategy:
+                #        move = self.path_to_point(self.all_trains[target_train]["position"]) """
                         
         if self.ultimate_strategy:
             if self.best_scores[self.nickname]>max_score+2:#continues the strategy even if some of the lead is lost, up to +2
                 if len(self.all_trains[self.nickname]['wagons']) == (self.delivery_zone_perimeter - 1):
-                    self.network.send_drop_wagon_request()
+                    if not self.all_trains[self.nickname]['boost_cooldown_active']:
+                        self.network.send_drop_wagon_request()
                 if len(self.all_trains[self.nickname]['wagons']) == (self.delivery_zone_perimeter - 2):
                     move = self.delivery_donut() #activates the strategy
             else:
                 self.ultimate_strategy = False #go back to normal mode if lead is lost
-      
-        print(self.closest_delivery_zone_point(), self.delivery_zone_pos)
         return Move(move)
 
 
