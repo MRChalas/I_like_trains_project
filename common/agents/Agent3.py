@@ -32,6 +32,9 @@ class Agent(BaseAgent):
         """
         Cordinates which are reused several times throughout the movement choice
         """
+
+        self.moves = [Move.LEFT.value, Move.DOWN.value, Move.UP.value, Move.RIGHT.value]
+
         #train coordinates
         self.train_position = self.all_trains[self.nickname]["position"]
         self.x_train_position = self.all_trains[self.nickname]["position"][0]
@@ -53,7 +56,7 @@ class Agent(BaseAgent):
         self.AVOID = 1000
         self.OCCUPIED = float('inf')
 
-    def distance_to_point(self, current_point, point):
+    def distance_to_point(self, current_point:tuple, new_point:tuple):
         """
         Calculates shortest distance between the train and a given point
 
@@ -61,17 +64,17 @@ class Agent(BaseAgent):
         OUT: shortest distance (tuple of int)
         """
 
-        return abs(current_point[0] - point[0]) + abs(current_point[1] - point[1])
+        return abs(current_point[0] - new_point[0]) + abs(current_point[1] - new_point[1])
 
-    def new_position(self, position:tuple, move: tuple, num_of_moves: int):
+    def new_position(self, position:tuple, move: tuple, steps=1):
         """
         Determines new train position after n moves
         
         IN: tuple corresponding to move, number of times train wants to move
         OUT: new position coordinates
         """
-        new_x = position[0] + (move[0] * self.cell_size) * num_of_moves
-        new_y = position[1] + (move[1] * self.cell_size) * num_of_moves
+        new_x = position[0] + (move[0] * self.cell_size) * steps
+        new_y = position[1] + (move[1] * self.cell_size) * steps
 
         return (new_x, new_y)
     
