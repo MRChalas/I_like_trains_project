@@ -699,4 +699,4 @@ class Agent(BaseAgent):
 
 
         
-
+#version sans strat de kill
