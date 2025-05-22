@@ -634,7 +634,7 @@ class Agent(BaseAgent):
         
         DELIVER = 0
         
-        if len(self.all_trains[self.nickname]['wagons']) > 1:
+        if len(self.all_trains[self.nickname]['wagons']) > 2:
             DELIVER = 1
 
         #disable delivery if the ultimate strategy is activated
@@ -643,35 +643,35 @@ class Agent(BaseAgent):
                 DELIVER = 0
         
         if DELIVER == 0:
-            close_to_delivery = True
+            close_to_delivery = False
             #condition to dodge this part if at the start of the game (otherwise errors pop up)
             if not self.best_scores:
                 close_to_delivery = self.close_to_delivery()
 
             #go to the delivery zone if close enough to it
-            if close_to_delivery and len(self.all_trains[self.nickname]['wagons'])>0:
+            if close_to_delivery and len(self.all_trains[self.nickname]['wagons']) > 0:
                 goal = self.closest_delivery_zone_point()
                 path = self.path_to_point(goal)
             else:
                 goal = self.closest_passenger()
                 path = self.path_to_point(goal) #deliver passengers
-        else:
-            
+        else: 
             passenger_on_way = self.passenger_on_way()
             #takes the passengers that are close to the path
             if passenger_on_way:
                 goal = self.closest_passenger()
                 path = self.path_to_point(goal)
+                #delivers if too long
                 if len(self.all_trains[self.nickname]['wagons']) > 8:
                     goal = self.closest_delivery_zone_point()
-                    path = self.path_to_point(goal) #goes back if too long
+                    path = self.path_to_point(goal)
             else:
                 goal = self.closest_delivery_zone_point()
                 path = self.path_to_point(goal)
 
         #activating the strategy if we are alone or with 2 players only
         if self.best_scores and (self.nickname in self.best_scores) \
-        and not delivery_pos_on_edge and len(self.all_trains)==2:
+        and not delivery_pos_on_edge and len(self.all_trains) == 2:
             #activate with a lead of 10 points minimum
             if self.best_scores[self.nickname] > (max_score + 9):
                 if len(self.all_trains[self.nickname]['wagons']) == (self.delivery_zone_perimeter - 1) and not self.ultimate_strategy:
@@ -682,13 +682,13 @@ class Agent(BaseAgent):
                     return move
                 else:
                     pass
-                self.ultimate_strategy = True #ensure strategy continues even if some of the lead is lost.
+            self.ultimate_strategy = True #ensure strategy continues even if some of the lead is lost.
 
         #ensure we are never too long
 
         if path:
             around_heads = self.around_head()
-            if goal in around_heads:
+            if tuple(goal) in around_heads:
                 move = self.other_move(goal)
             else:
                 move = self.get_direction(path)
@@ -704,6 +704,7 @@ class Agent(BaseAgent):
                     move = self.delivery_donut() #activates the strategy
             else:
                 self.ultimate_strategy = False #go back to normal mode if lead is lost
+        
         return Move(move)
 
 

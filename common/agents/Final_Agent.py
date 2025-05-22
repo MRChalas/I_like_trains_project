@@ -663,16 +663,16 @@ class Agent(BaseAgent):
             path = self.path_to_point(goal)
 
         if path:
-            if tuple(goal) in self.all_trains:
+            around_heads = self.around_head()
+            if tuple(goal) in around_heads:
                 move = self.other_move(goal)
             else:
                 move = self.get_direction(path)
         else:
             move = self.other_move(goal)
-
-                        
+             
         if self.ultimate_strategy:
-            if self.best_scores[self.nickname]>max_score+2:#continues the strategy even if some of the lead is lost, up to +2
+            if self.best_scores[self.nickname]> (max_score+2):#continues the strategy even if some of the lead is lost, up to +2
                 if len(self.all_trains[self.nickname]['wagons']) == (self.delivery_zone_perimeter - 1):
                     self.network.send_drop_wagon_request()
                 if len(self.all_trains[self.nickname]['wagons']) == (self.delivery_zone_perimeter - 2):
