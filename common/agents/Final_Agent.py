@@ -670,22 +670,6 @@ class Agent(BaseAgent):
         else:
             move = self.other_move(goal)
 
-
-        """        if self.best_scores:
-            if self.all_trains[self.nickname]["score"] == 0:
-                max_actual_score = 0
-                #find the max current score of any train.
-                for train in self.all_trains:
-                    if train == self.nickname:
-                        continue
-                    if self.all_trains[train]["score"]:
-                        if self.all_trains[train]["score"] > max_actual_score:
-                            target_score = self.all_trains[train]["score"]
-                            target_train = train
-                #if self.all_trains[train]["score"]:
-                #    #target train with high score if our train just died and score difference with opponent is high
-                #    if target_score > 1 and not self.ultimate_strategy:
-                #        move = self.path_to_point(self.all_trains[target_train]["position"]) """
                         
         if self.ultimate_strategy:
             if self.best_scores[self.nickname]>max_score+2:#continues the strategy even if some of the lead is lost, up to +2
