@@ -127,8 +127,7 @@ class Agent(BaseAgent):
                 if distance < min_distance:
                     min_distance = distance
                     closest_delivery_point = point
-        print(closest_delivery_point)
-        return tuple(closest_delivery_point)
+        return tuple(self.delivery_zone_pos)
      
     def get_neighbors(self, current_point, grid_with_obstacles):
         """
@@ -632,7 +631,7 @@ class Agent(BaseAgent):
                 path = self.path_to_point(goal) #deliver passengers
         
         else:
-            if len(self.all_trains[self.nickname]['wagons']) > 4:
+            if len(self.all_trains[self.nickname]['wagons']) > 6:
                 goal = self.closest_delivery_zone_point()
                 path = self.path_to_point(goal) #goes back if too long
             passenger_on_way = self.passenger_on_way()
@@ -659,11 +658,15 @@ class Agent(BaseAgent):
             self.ultimate_strategy = True #ensure strategy continues even if some of the lead is lost.
 
         #ensure we are never too long
-        if len(self.all_trains[self.nickname]['wagons']) >= 6 and not self.ultimate_strategy:
+        if len(self.all_trains[self.nickname]['wagons']) >= 8 and not self.ultimate_strategy:
             goal = self.closest_delivery_zone_point()
             path = self.path_to_point(goal)
+
         if path:
-            move = self.get_direction(path)
+            if tuple(goal) in self.all_trains:
+                move = self.other_move(goal)
+            else:
+                move = self.get_direction(path)
         else:
             move = self.other_move(goal)
 
@@ -693,7 +696,6 @@ class Agent(BaseAgent):
             else:
                 self.ultimate_strategy = False #go back to normal mode if lead is lost
       
-        print(self.closest_delivery_zone_point(), self.delivery_zone_pos)
         return Move(move)
 
 
