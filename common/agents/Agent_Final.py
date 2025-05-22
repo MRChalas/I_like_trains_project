@@ -699,7 +699,9 @@ class Agent(BaseAgent):
                             target_score = self.all_trains[train]["score"]
                             target_train = train
                     #target train with high score if our train just died and score difference with opponent is high
-                if target_score > 20 :
+                if target_score > 20:
+                        if not self.all_trains[self.nickname]['boost_cooldown_active']:
+                            self.network.send_drop_wagon_request()
                         move = self.other_move(self.all_trains[target_train]["position"],True) #just rushes the head, very effective
                         
         if self.ultimate_strategy:
